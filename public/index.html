@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Control de Asistencia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#1c1815; --surface:#242019; --surface-2:#2f2820;
+    --brass:#c9a24b; --brass-dark:#8f6f34; --brass-light:#e6c979;
+    --cream:#f4ead9; --teal:#4f8a82; --teal-light:#7fb3ab;
+    --muted:#a89a86; --danger:#c15f45; --line:#3a3227; --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--cream); font-family:'Space Grotesk',sans-serif; min-height:100vh; display:flex; flex-direction:column; -webkit-tap-highlight-color:transparent;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  header{padding:18px 20px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:linear-gradient(180deg,var(--surface),var(--bg));}
+  .brand{display:flex; flex-direction:column; gap:2px;}
+  .brand .eyebrow{font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.18em; color:var(--brass); text-transform:uppercase;}
+  .brand h1{margin:0; font-size:18px; font-weight:700;}
+  .clock{font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:600; color:var(--brass-light); letter-spacing:.05em; font-variant-numeric: tabular-nums; text-align:right;}
+  .clock .date{display:block; font-size:10px; color:var(--muted); font-weight:400; letter-spacing:.1em; text-transform:uppercase; margin-top:2px;}
+  main{flex:1; width:100%; max-width:520px; margin:0 auto; padding:22px 18px 100px;}
+  .view{display:none;}
+  .view.active{display:block; animation:fadeIn .25s ease;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:16px;}
+  h2.section-title{font-size:12px; text-transform:uppercase; letter-spacing:.16em; color:var(--brass); margin:0 0 14px; font-weight:600;}
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.08em;}
+  input[type=text], input[type=url], input[type=date], input[type=password], input[type=tel], select{
+    width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--cream);
+    padding:12px 14px; border-radius:10px; font-size:15px; font-family:'Space Grotesk',sans-serif; outline:none;
+  }
+  input:focus, select:focus{border-color:var(--brass);}
+  .stamp-wrap{display:flex; flex-direction:column; align-items:center; padding:10px 0 4px;}
+  .stamp{
+    width:150px; height:150px; border-radius:50%; border:none;
+    background:radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass) 55%, var(--brass-dark) 100%);
+    box-shadow:0 8px 0 var(--brass-dark), 0 14px 24px rgba(0,0,0,.45), inset 0 2px 4px rgba(255,255,255,.4);
+    color:#2a2010; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px;
+    letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+    transition:transform .08s ease, box-shadow .08s ease; position:relative;
+  }
+  .stamp:disabled{opacity:.4; cursor:not-allowed;}
+  .stamp:active:not(:disabled){transform:translateY(6px); box-shadow:0 2px 0 var(--brass-dark), 0 4px 10px rgba(0,0,0,.4), inset 0 2px 4px rgba(255,255,255,.3);}
+  .stamp-hint{margin-top:12px; font-size:12px; color:var(--muted); text-align:center; min-height:16px;}
+  .ticket-slot{min-height:10px; display:flex; justify-content:center; overflow:hidden;}
+  .ticket{
+    width:100%; max-width:320px; background:var(--cream); color:#241d14; border-radius:4px;
+    padding:16px 18px 14px; margin-top:6px; transform:translateY(-120%); opacity:0;
+    transition:transform .45s cubic-bezier(.2,.9,.3,1.2), opacity .3s ease; position:relative;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .ticket.show{transform:translateY(0); opacity:1;}
+  .ticket .t-action{font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;}
+  .ticket .t-action.entrada{color:var(--brass-dark);}
+  .ticket .t-action.salida{color:#3d6b64;}
+  .ticket .t-name{font-size:18px; font-weight:700; margin:4px 0 2px;}
+  .ticket .t-time{font-family:'JetBrains Mono',monospace; font-size:30px; font-weight:700; letter-spacing:.02em; margin:4px 0 0;}
+  .ticket .t-date{font-family:'JetBrains Mono',monospace; font-size:11px; color:#5c5140; margin-top:4px;}
+  .presentes-item{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); font-size:14px;}
+  .presentes-item:last-child{border-bottom:none;}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--teal-light); display:inline-block; margin-right:8px; box-shadow:0 0 6px var(--teal-light);}
+  .empty-note{color:var(--muted); font-size:13px; text-align:center; padding:6px 0;}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:11px 16px; border-radius:10px;
+    border:1px solid var(--line); background:var(--surface-2); color:var(--cream); font-family:'Space Grotesk',sans-serif;
+    font-weight:600; font-size:13px; cursor:pointer; transition:border-color .15s ease, background .15s ease;
+  }
+  .btn:hover{border-color:var(--brass);}
+  .btn-primary{background:var(--brass); color:#2a2010; border-color:var(--brass);}
+  .btn-primary:hover{background:var(--brass-light);}
+  .btn-danger{background:transparent; color:var(--danger); border-color:var(--danger);}
+  .btn-link{background:none; border:none; color:var(--brass-light); text-decoration:underline; font-size:13px; padding:6px 0; cursor:pointer;}
+  .btn-block{width:100%;}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); padding:0 8px 8px 0; font-weight:600; border-bottom:1px solid var(--line);}
+  td{padding:9px 8px 9px 0; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12.5px;}
+  td.name{font-family:'Space Grotesk',sans-serif; font-size:13.5px;}
+  .employee-row{display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--line);}
+  .employee-row:last-child{border-bottom:none;}
+  .employee-row .emp-info .emp-name{font-weight:600; font-size:14px;}
+  .employee-row .emp-info .emp-code{font-family:'JetBrains Mono',monospace; color:var(--muted); font-size:11px;}
+  #qrcode{display:flex; justify-content:center; padding:18px; background:var(--cream); border-radius:12px; margin-top:14px;}
+  nav.tabbar{position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--line); display:flex; padding:6px 6px calc(6px + env(safe-area-inset-bottom)); z-index:10;}
+  nav.tabbar button{flex:1; background:none; border:none; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 4px; font-family:'Space Grotesk',sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:.06em; cursor:pointer; border-radius:10px;}
+  nav.tabbar button svg{width:20px; height:20px;}
+  nav.tabbar button.active{color:var(--brass-light);}
+  nav.tabbar button.active svg{filter:drop-shadow(0 0 4px rgba(201,162,75,.5));}
+  .toast{position:fixed; top:16px; left:50%; transform:translate(-50%,-140%); background:var(--surface-2); border:1px solid var(--brass); color:var(--cream); padding:10px 16px; border-radius:10px; font-size:13px; z-index:20; transition:transform .3s ease; max-width:90%; text-align:center;}
+  .toast.show{transform:translate(-50%,0);}
+  .filters{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .filters > div{flex:1; min-width:120px;}
+  .note{font-size:11.5px; color:var(--muted); line-height:1.5; margin-top:10px;}
+  .pin-display{display:flex; gap:10px; justify-content:center; margin:14px 0;}
+  .pin-dot{width:16px; height:16px; border-radius:50%; border:1px solid var(--brass); background:transparent;}
+  .pin-dot.filled{background:var(--brass);}
+  .keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:260px; margin:0 auto;}
+  .keypad button{aspect-ratio:1; border-radius:12px; border:1px solid var(--line); background:var(--surface-2); color:var(--cream); font-size:20px; font-family:'JetBrains Mono',monospace; cursor:pointer;}
+  .keypad button:active{background:var(--brass); color:#2a2010;}
+  .keypad button.wide{font-size:12px; text-transform:uppercase;}
+  .subtabs{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .subtab-btn{padding:8px 14px; border-radius:20px; border:1px solid var(--line); background:var(--surface); color:var(--muted); font-size:12px; font-family:'Space Grotesk',sans-serif; font-weight:600; cursor:pointer;}
+  .subtab-btn.active{background:var(--brass); color:#2a2010; border-color:var(--brass);}
+  .admin-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
+  .admin-header h2{margin:0; font-size:16px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="eyebrow">Control de asistencia</span>
+    <h1>Fichero</h1>
+  </div>
+  <div class="clock">
+    <span id="clockTime" class="mono">--:--:--</span>
+    <span class="date" id="clockDate">-- ---</span>
+  </div>
+</header>
+
+<div class="toast" id="toast"></div>
+
+<main>
+  <!-- MARCAR -->
+  <section class="view active" id="view-marcar">
+    <div class="card" id="marcarCardLogin">
+      <h2 class="section-title">¿Quién marca?</h2>
+      <label for="empleadoInput">Escribí tu nombre</label>
+      <input type="text" id="empleadoInput" list="empleadosList" placeholder="Nombre y apellido" autocomplete="off">
+      <datalist id="empleadosList"></datalist>
+      <div id="pinArea" hidden>
+        <label style="margin-top:14px;">Tu PIN</label>
+        <div class="pin-display" id="pinDisplay">
+          <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+        </div>
+        <div class="keypad" id="keypad"></div>
+      </div>
+      <div class="stamp-wrap">
+        <button class="stamp" id="btnMarcar" disabled>Marcar</button>
+        <div class="stamp-hint" id="stampHint">Escribí tu nombre para continuar</div>
+      </div>
+      <div style="text-align:center; margin-top:6px;">
+        <button class="btn-link" id="btnMostrarRegistro">¿Primera vez? Registrate acá</button>
+      </div>
+      <div class="ticket-slot">
+        <div class="ticket" id="ticket">
+          <span class="t-action" id="ticketAction">Entrada</span>
+          <div class="t-name" id="ticketName">—</div>
+          <div class="t-time mono" id="ticketTime">00:00</div>
+          <div class="t-date mono" id="ticketDate">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="cardRegistro" hidden>
+      <h2 class="section-title">Registrate</h2>
+      <label for="regNombre">Nombre y apellido</label>
+      <input type="text" id="regNombre" placeholder="Ej: Ana Gómez">
+      <div style="height:10px"></div>
+      <label for="regPin">Elegí un PIN de 4 dígitos</label>
+      <input type="tel" inputmode="numeric" maxlength="4" id="regPin" placeholder="••••">
+      <div style="height:10px"></div>
+      <label for="regPin2">Repetí el PIN</label>
+      <input type="tel" inputmode="numeric" maxlength="4" id="regPin2" placeholder="••••">
+      <div style="height:14px"></div>
+      <div class="row">
+        <button class="btn" id="btnCancelarRegistro">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmarRegistro">Registrarme y marcar entrada</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Presentes ahora</h2>
+      <div id="presentesList"><div class="empty-note">Nadie marcó entrada todavía hoy.</div></div>
+    </div>
+  </section>
+
+  <!-- ADMIN LOGIN -->
+  <section class="view" id="view-admin-login">
+    <div class="card">
+      <h2 class="section-title" id="adminLoginTitle">Administrador</h2>
+      <p class="note" id="adminLoginHelp" style="margin-top:-6px; margin-bottom:14px;"></p>
+      <label for="adminUser">Usuario</label>
+      <input type="text" id="adminUser" placeholder="admin" autocomplete="off">
+      <div style="height:10px"></div>
+      <label for="adminPass">Contraseña</label>
+      <input type="password" id="adminPass" autocomplete="off">
+      <div style="height:14px"></div>
+      <button class="btn btn-primary btn-block" id="btnAdminEntrar">Entrar</button>
+      <div id="adminLoginError" class="note" style="color:var(--danger); display:none;">Usuario o contraseña incorrectos.</div>
+    </div>
+  </section>
+
+  <!-- ADMIN PANEL -->
+  <section class="view" id="view-admin">
+    <div class="admin-header">
+      <h2>Panel de administrador</h2>
+      <div class="row" style="flex:none; gap:8px;">
+        <button class="btn" id="btnActualizarAdmin">Actualizar</button>
+        <button class="btn" id="btnCerrarSesionAdmin">Cerrar sesión</button>
+      </div>
+    </div>
+    <div class="subtabs">
+      <button class="subtab-btn active" data-sub="empleados">Empleados</button>
+      <button class="subtab-btn" data-sub="registros">Registros</button>
+      <button class="subtab-btn" data-sub="qr">Generar QR</button>
+    </div>
+
+    <div class="subview active" id="sub-empleados">
+      <div class="card">
+        <h2 class="section-title">Empleados registrados</h2>
+        <div id="empleadosLista"><div class="empty-note">Todavía no hay empleados registrados.</div></div>
+      </div>
+    </div>
+
+    <div class="subview" id="sub-registros" hidden>
+      <div class="card">
+        <h2 class="section-title">Filtros</h2>
+        <div class="filters">
+          <div><label for="filtroEmpleado">Empleado</label><select id="filtroEmpleado"><option value="">Todos</option></select></div>
+          <div><label for="filtroDesde">Desde</label><input type="date" id="filtroDesde"></div>
+          <div><label for="filtroHasta">Hasta</label><input type="date" id="filtroHasta"></div>
+        </div>
+        <button class="btn btn-block" id="btnExportarCSV">Exportar CSV</button>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Marcaciones</h2>
+        <div style="overflow-x:auto">
+          <table id="tablaRegistros">
+            <thead><tr><th>Fecha</th><th>Empleado</th><th>Entrada</th><th>Salida</th><th>Horas</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="registrosEmpty" class="empty-note" style="display:none;">No hay marcaciones para este filtro.</div>
+      </div>
+    </div>
+
+    <div class="subview" id="sub-qr" hidden>
+      <div class="card">
+        <h2 class="section-title">Generar QR para imprimir</h2>
+        <label for="urlInput">Enlace público de esta app</label>
+        <input type="url" id="urlInput" placeholder="https://...">
+        <div style="height:10px"></div>
+        <button class="btn btn-primary btn-block" id="btnGenerarQR">Generar QR</button>
+        <div id="qrcode"></div>
+        <div class="row" style="margin-top:12px;" id="qrActions" hidden>
+          <button class="btn" id="btnDescargarQR">Descargar PNG</button>
+          <button class="btn" id="btnImprimirQR">Imprimir</button>
+        </div>
+        <p class="note">Pegá el link público de tu servidor (por ejemplo el que te da tu hosting), generá el QR e imprimilo.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar">
+  <button class="tab-btn active" data-view="marcar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    Marcar
+  </button>
+  <button class="tab-btn" data-view="admin-gate">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    Administrador
+  </button>
+</nav>
+
+<script>
+let empleadosNombres = [];
+let registrosCache = [];
+let empleadosAdminCache = [];
+let adminUser = null, adminPass = null, adminExiste = null;
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function pad(n){return n.toString().padStart(2,'0');}
+function timeStr(d=new Date()){return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());}
+function timeShort(iso){const d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes());}
+function dateHuman(d=new Date()){
+  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return dias[d.getDay()]+' '+d.getDate()+' '+meses[d.getMonth()];
+}
+function todayStr(d=new Date()){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function escapeHtml(s){return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function tickClock(){
+  const now=new Date();
+  document.getElementById('clockTime').textContent=timeStr(now);
+  document.getElementById('clockDate').textContent=dateHuman(now);
+}
+setInterval(tickClock,1000); tickClock();
+
+async function api(path, opts={}){
+  const res = await fetch('/api'+path, {
+    method: opts.method||'GET',
+    headers: Object.assign({'Content-Type':'application/json'}, opts.admin ? {'x-admin-user':adminUser,'x-admin-pass':adminPass} : {}),
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'Error de red');
+  return data;
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('main > section.view').forEach(v=>v.classList.remove('active'));
+    if(btn.dataset.view==='marcar'){ document.getElementById('view-marcar').classList.add('active'); }
+    else { goToAdminGate(); }
+  });
+});
+
+function goToAdminGate(){
+  if(adminUser){
+    document.getElementById('view-admin').classList.add('active');
+    refreshAdmin();
+  }else{
+    document.getElementById('adminLoginHelp').textContent = 'Ingresá usuario y contraseña. Si es la primera vez, se van a configurar automáticamente.';
+    document.getElementById('adminLoginError').style.display='none';
+    document.getElementById('view-admin-login').classList.add('active');
+  }
+}
+document.getElementById('btnAdminEntrar').addEventListener('click', async ()=>{
+  const user = document.getElementById('adminUser').value.trim();
+  const pass = document.getElementById('adminPass').value;
+  if(!user || !pass){ showToast('Completá usuario y contraseña.'); return; }
+  try{
+    await api('/admin/login', { method:'POST', body:{ user, pass } });
+    adminUser = user; adminPass = pass;
+    document.getElementById('adminPass').value='';
+    document.querySelectorAll('main > section.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-admin').classList.add('active');
+    await refreshAdmin();
+  }catch(e){
+    document.getElementById('adminLoginError').textContent = e.message;
+    document.getElementById('adminLoginError').style.display='block';
+  }
+});
+document.getElementById('btnActualizarAdmin').addEventListener('click', async ()=>{ await refreshAdmin(); showToast('Datos actualizados.'); });
+document.getElementById('btnCerrarSesionAdmin').addEventListener('click', ()=>{
+  adminUser=null; adminPass=null;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('[data-view="marcar"]').classList.add('active');
+  document.querySelectorAll('main > section.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-marcar').classList.add('active');
+});
+
+document.querySelectorAll('.subtab-btn').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    document.querySelectorAll('.subtab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.subview').forEach(v=>{v.hidden=true;});
+    document.getElementById('sub-'+btn.dataset.sub).hidden=false;
+    if(btn.dataset.sub!=='qr') await refreshAdmin();
+  });
+});
+
+async function refreshAdmin(){
+  try{
+    empleadosAdminCache = await api('/admin/empleados', { admin:true });
+    registrosCache = await api('/admin/registros', { admin:true });
+    renderEmpleadosLista();
+    renderFiltroEmpleado();
+    renderRegistros();
+  }catch(e){ showToast(e.message); }
+}
+
+function renderEmpleadosLista(){
+  const cont = document.getElementById('empleadosLista');
+  if(empleadosAdminCache.length===0){ cont.innerHTML='<div class="empty-note">Todavía no hay empleados registrados.</div>'; return; }
+  cont.innerHTML = empleadosAdminCache.map(e=>`
+    <div class="employee-row">
+      <div class="emp-info"><div class="emp-name">${escapeHtml(e.nombre)}</div><div class="emp-code">Legajo ${e.codigo}</div></div>
+      <button class="btn btn-danger" data-del="${e.id}">Quitar</button>
+    </div>`).join('');
+  cont.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      await api('/admin/empleados/'+b.dataset.del, { method:'DELETE', admin:true });
+      await refreshAdmin();
+    });
+  });
+}
+function renderFiltroEmpleado(){
+  const sel = document.getElementById('filtroEmpleado');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + empleadosAdminCache.map(e=>`<option value="${e.id}">${escapeHtml(e.nombre)}</option>`).join('');
+  sel.value = current;
+}
+function horasEntre(entrada, salida){
+  if(!salida) return '—';
+  return ((new Date(salida)-new Date(entrada))/3600000).toFixed(2)+' h';
+}
+function renderRegistros(){
+  const empId = document.getElementById('filtroEmpleado').value;
+  const desde = document.getElementById('filtroDesde').value;
+  const hasta = document.getElementById('filtroHasta').value;
+  let filtrados = [...registrosCache];
+  if(empId) filtrados = filtrados.filter(r=>r.empleadoId===empId);
+  if(desde) filtrados = filtrados.filter(r=>r.fecha>=desde);
+  if(hasta) filtrados = filtrados.filter(r=>r.fecha<=hasta);
+  filtrados.sort((a,b)=> new Date(b.entrada)-new Date(a.entrada));
+  const tbody = document.querySelector('#tablaRegistros tbody');
+  const emptyMsg = document.getElementById('registrosEmpty');
+  if(filtrados.length===0){ tbody.innerHTML=''; emptyMsg.style.display='block'; return; }
+  emptyMsg.style.display='none';
+  tbody.innerHTML = filtrados.map(r=>`
+    <tr><td>${r.fecha}</td><td class="name">${escapeHtml(r.nombre)}</td><td>${timeShort(r.entrada)}</td>
+    <td>${r.salida?timeShort(r.salida):'—'}</td><td>${horasEntre(r.entrada,r.salida)}</td></tr>`).join('');
+}
+['filtroEmpleado','filtroDesde','filtroHasta'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', renderRegistros);
+});
+document.getElementById('btnExportarCSV').addEventListener('click', ()=>{
+  const rows=[['Fecha','Empleado','Entrada','Salida','Horas']];
+  registrosCache.forEach(r=>rows.push([r.fecha,r.nombre,timeShort(r.entrada),r.salida?timeShort(r.salida):'',horasEntre(r.entrada,r.salida)]));
+  const csv = rows.map(r=>r.map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='registros_asistencia.csv'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ---------- registro / marcar ----------
+const cardRegistro = document.getElementById('cardRegistro');
+const marcarCardLogin = document.getElementById('marcarCardLogin');
+const empleadoInput = document.getElementById('empleadoInput');
+const btnMarcar = document.getElementById('btnMarcar');
+const stampHint = document.getElementById('stampHint');
+const pinArea = document.getElementById('pinArea');
+const pinDots = document.querySelectorAll('.pin-dot');
+let pinActual='';
+
+document.getElementById('btnMostrarRegistro').addEventListener('click', ()=>{
+  cardRegistro.hidden=false; marcarCardLogin.hidden=true;
+  document.getElementById('regNombre').value = empleadoInput.value.trim();
+});
+document.getElementById('btnCancelarRegistro').addEventListener('click', ()=>{
+  cardRegistro.hidden=true; marcarCardLogin.hidden=false;
+});
+document.getElementById('btnConfirmarRegistro').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('regNombre').value.trim();
+  const pin = document.getElementById('regPin').value.trim();
+  const pin2 = document.getElementById('regPin2').value.trim();
+  if(!nombre){ showToast('Escribí tu nombre.'); return; }
+  if(!/^\d{4}$/.test(pin)){ showToast('El PIN debe tener 4 números.'); return; }
+  if(pin!==pin2){ showToast('Los PIN no coinciden.'); return; }
+  try{
+    const r = await api('/registro', { method:'POST', body:{nombre, pin} });
+    document.getElementById('regNombre').value=''; document.getElementById('regPin').value=''; document.getElementById('regPin2').value='';
+    cardRegistro.hidden=true; marcarCardLogin.hidden=false;
+    mostrarTicket(r.nombre, r.accion, new Date(r.hora));
+    cargarPresentes(); cargarNombres();
+    showToast('¡Listo! Ya quedaste registrado.');
+  }catch(e){ showToast(e.message); }
+});
+
+function buildKeypad(){
+  const keypad = document.getElementById('keypad');
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','borrar'];
+  keypad.innerHTML = keys.map(k=>{
+    if(k==='') return '<span></span>';
+    if(k==='borrar') return `<button data-key="borrar" class="wide">Borrar</button>`;
+    return `<button data-key="${k}">${k}</button>`;
+  }).join('');
+  keypad.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const k = b.dataset.key;
+      if(k==='borrar'){ pinActual = pinActual.slice(0,-1); }
+      else if(pinActual.length<4){ pinActual += k; }
+      updatePinDots(); evaluarHabilitacion();
+    });
+  });
+}
+function updatePinDots(){ pinDots.forEach((d,i)=> d.classList.toggle('filled', i<pinActual.length)); }
+function evaluarHabilitacion(){
+  const nombreOk = empleadosNombres.some(n=>n.toLowerCase()===empleadoInput.value.trim().toLowerCase());
+  if(nombreOk && pinActual.length===4){
+    btnMarcar.disabled=false;
+    stampHint.textContent='Listo. Apretá para marcar.';
+  }else{
+    btnMarcar.disabled=true;
+    stampHint.textContent = nombreOk ? 'Ingresá tu PIN de 4 dígitos' : 'Escribí tu nombre para continuar';
+  }
+}
+buildKeypad();
+
+async function cargarNombres(){
+  try{
+    const lista = await api('/empleados-publico');
+    empleadosNombres = lista.map(e=>e.nombre);
+    document.getElementById('empleadosList').innerHTML = empleadosNombres.map(n=>`<option value="${escapeHtml(n)}">`).join('');
+  }catch(e){}
+}
+async function cargarPresentes(){
+  try{
+    const lista = await api('/presentes');
+    const cont = document.getElementById('presentesList');
+    if(lista.length===0){ cont.innerHTML='<div class="empty-note">Nadie marcó entrada todavía hoy.</div>'; return; }
+    cont.innerHTML = lista.sort((a,b)=>new Date(a.entrada)-new Date(b.entrada))
+      .map(r=>`<div class="presentes-item"><span><span class="dot"></span>${escapeHtml(r.nombre)}</span><span class="mono">${timeShort(r.entrada)}</span></div>`).join('');
+  }catch(e){}
+}
+
+empleadoInput.addEventListener('input', ()=>{
+  pinActual=''; updatePinDots();
+  const nombreOk = empleadosNombres.some(n=>n.toLowerCase()===empleadoInput.value.trim().toLowerCase());
+  pinArea.hidden = !nombreOk;
+  evaluarHabilitacion();
+});
+
+btnMarcar.addEventListener('click', async ()=>{
+  if(pinActual.length!==4) return;
+  btnMarcar.disabled=true;
+  try{
+    const r = await api('/marcar', { method:'POST', body:{ nombre: empleadoInput.value.trim(), pin: pinActual } });
+    mostrarTicket(r.nombre, r.accion, new Date(r.hora));
+    cargarPresentes();
+    empleadoInput.value=''; pinActual=''; updatePinDots(); pinArea.hidden=true;
+    stampHint.textContent='Escribí tu nombre para continuar';
+  }catch(e){
+    showToast(e.message);
+    pinActual=''; updatePinDots();
+  }
+  btnMarcar.disabled=true;
+});
+
+function mostrarTicket(nombre, accion, fecha){
+  const ticket = document.getElementById('ticket');
+  document.getElementById('ticketAction').textContent = accion==='entrada' ? 'Entrada registrada' : 'Salida registrada';
+  document.getElementById('ticketAction').className = 't-action ' + accion;
+  document.getElementById('ticketName').textContent = nombre;
+  document.getElementById('ticketTime').textContent = timeStr(fecha).slice(0,5);
+  document.getElementById('ticketDate').textContent = dateHuman(fecha)+' · '+todayStr(fecha);
+  ticket.classList.remove('show'); void ticket.offsetWidth; ticket.classList.add('show');
+}
+
+// ---------- QR ----------
+document.getElementById('btnGenerarQR').addEventListener('click', ()=>{
+  const url = document.getElementById('urlInput').value.trim();
+  if(!url){ showToast('Pegá el link de tu servidor primero.'); return; }
+  const cont = document.getElementById('qrcode'); cont.innerHTML='';
+  new QRCode(cont, { text:url, width:220, height:220, colorDark:'#241d14', colorLight:'#f4ead9', correctLevel:QRCode.CorrectLevel.M });
+  document.getElementById('qrActions').hidden=false;
+});
+document.getElementById('btnDescargarQR').addEventListener('click', ()=>{
+  const img = document.querySelector('#qrcode img') || document.querySelector('#qrcode canvas');
+  if(!img) return;
+  const a = document.createElement('a'); a.download='qr-fichero.png';
+  a.href = img.tagName==='CANVAS' ? img.toDataURL('image/png') : img.src;
+  a.click();
+});
+document.getElementById('btnImprimirQR').addEventListener('click', ()=>{ window.print(); });
+
+// ---------- init ----------
+cargarNombres();
+cargarPresentes();
+setInterval(()=>{
+  if(document.getElementById('view-marcar').classList.contains('active')){ cargarPresentes(); }
+  if(document.getElementById('view-admin').classList.contains('active')){ refreshAdmin(); }
+}, 15000);
+</script>
+</body>
+</html>
